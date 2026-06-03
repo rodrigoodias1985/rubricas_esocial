@@ -10,7 +10,7 @@ DROP VIEW IF EXISTS vw_rubricas_consolidadas
 cursor.execute("""
 CREATE VIEW vw_rubricas_consolidadas AS
 
--- REGISTROS DA API (com prioridade para consultoria)
+-- REGISTROS DA API (com prioridade para CONSULTORIA)
 
 SELECT
 
@@ -50,12 +50,34 @@ SELECT
     r.afastamento,
 
     c.observacoes,
-    c.tipo_registro,
+c.tipo_registro,
 
-    CASE
-        WHEN c.codigo IS NOT NULL THEN 'CONSULTORIA'
-        ELSE 'API'
-    END AS origem
+CASE
+    WHEN SUBSTR(
+        COALESCE(c.irrf_classificacao, r.irrf_classificacao),
+        1,
+        2
+    ) = '00'
+    THEN 'SIM'
+    ELSE 'NAO'
+END AS exige_analise_irrf,
+
+CASE
+    WHEN SUBSTR(
+        COALESCE(c.irrf_classificacao, r.irrf_classificacao),
+        1,
+        2
+    ) = '00'
+    THEN 'ATENÇÃO: Esta natureza possui classificação IRRF iniciada pelo código 00. A definição entre os códigos 09 ou 79 deverá ser realizada pelo usuário conforme a finalidade da verba e seus reflexos no Informe de Rendimentos.'
+    ELSE NULL
+END AS alerta_irrf,
+
+'IMPORTANTE: As informações apresentadas neste sistema possuem caráter orientativo e foram elaboradas com base na Tabela 03 do eSocial, legislação vigente e entendimento técnico da consultoria. A definição final da incidência tributária, previdenciária e fundiária de cada verba deve ser realizada pelo usuário, considerando as particularidades da rubrica cadastrada.' AS aviso_sistema,
+
+CASE
+    WHEN c.codigo IS NOT NULL THEN 'CONSULTORIA'
+    ELSE 'API'
+END AS origem
 
 FROM rubricas r
 
@@ -101,7 +123,21 @@ SELECT
     c.observacoes,
     c.tipo_registro,
 
-    'CONSULTORIA' AS origem
+    CASE
+        WHEN SUBSTR(c.irrf_classificacao,1,2) = '00'
+        THEN 'SIM'
+        ELSE 'NAO'
+    END,
+
+    CASE
+        WHEN SUBSTR(c.irrf_classificacao,1,2) = '00'
+        THEN 'ATENÇÃO: Esta natureza está classificada como 00 - Rendimento não tributável. A definição entre os códigos 09 ou 79 deverá ser realizada pelo usuário conforme a finalidade da verba e seus reflexos no Informe de Rendimentos.'
+        ELSE NULL
+    END,
+
+    'IMPORTANTE: As informações apresentadas neste sistema possuem caráter orientativo e foram elaboradas com base na Tabela 03 do eSocial, legislação vigente e entendimento técnico da consultoria. A definição final da incidência tributária, previdenciária e fundiária de cada verba deve ser realizada pelo usuário, considerando as particularidades da rubrica cadastrada.',
+
+    'CONSULTORIA'
 
 FROM rubricas_consultoria c
 
@@ -114,6 +150,6 @@ WHERE NOT EXISTS (
 
 conn.commit()
 
-print("VIEW vw_rubricas_consolidadas criada com sucesso.")
+print("VIEW vw_rubricas_consolidadas atualizada com sucesso.")
 
 conn.close()
